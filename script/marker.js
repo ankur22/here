@@ -5,17 +5,17 @@ function initMap() {
   var myLatLng = {lat: 0, lng: 0};
 
   map = new google.maps.Map(document.getElementById('map'), {
-    zoom: 3,
+    zoom: 10,
     center: myLatLng
   });
 
-  getAndDisplayUnits();
+  getAndDisplayUnits(true);
   startUpdateLoop();
 }
 
 function startUpdateLoop() {
   setInterval(function() {
-    getAndDisplayUnits();
+    getAndDisplayUnits(false);
   }, 60000);
 }
 
@@ -38,7 +38,7 @@ function storeLastHereDateToLocalStorage(lastHere) {
   localStorage.setItem('lastHere', lastHere);
 }
 
-function getAndDisplayUnits() {
+function getAndDisplayUnits(firstInit) {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (xhttp.readyState == XMLHttpRequest.DONE && xhttp.status == 200) {
@@ -49,15 +49,13 @@ function getAndDisplayUnits() {
       var latestEventDT = new Date(0);
       var contentStrings = [];
 
-      var avgLat = 0;
-      var avgLong = 0;
+      var latestLat = 0;
+      var latestLong = 0;
 
       for (i = 0; i < greetings.length; ++i) {
         var greeting = greetings[i];
 
         var latlong = {lat: greeting.lat, lng: greeting.long};
-        avgLat += greeting.lat;
-        avgLong += greeting.long;
         var marker = null;
         var eventDT = new Date(greeting.eventDT);
 
@@ -76,6 +74,8 @@ function getAndDisplayUnits() {
 
         if (eventDT > latestEventDT) {
           latestEventDT = eventDT;
+          latestLat = greeting.lat;
+          latestLong = greeting.long;
         }
 
         contentStrings.push("<b>" + greeting.eventDT + "</b><br /><a href=\""+ greeting.photo +"\" target=\"_blank\"><img src=\""+ greeting.thumbnail +"\" /></a><p>" +greeting.notes+"</p><p>Photo taken on: "+greeting.photoDT+"</p>");
@@ -90,7 +90,9 @@ function getAndDisplayUnits() {
 
          markersArray.push(marker);
       }
-      map.setCenter(new google.maps.LatLng(avgLat/greetings.length,avgLong/greetings.length));
+      if (firstInit) {
+        map.setCenter(new google.maps.LatLng(latestLat,latestLong));
+      }
 
       latestEventDT.setSeconds(latestEventDT.getSeconds() + 1);
       storeLastHereDateToLocalStorage(latestEventDT);
