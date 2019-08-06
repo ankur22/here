@@ -1,0 +1,7 @@
+cron:
+- description: "retry get all points"
+  url: /v1/cache/update
+  schedule: every 10 minutes
+  retry_parameters:
+    min_backoff_seconds: 2
+    max_doublings: 5
