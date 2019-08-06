@@ -50,15 +50,13 @@ def return_login_screen(instance):
 class UpdateCache(webapp2.RequestHandler):
 
     def get(self):
-        privilege = user.get_user_privileges()
-        if Privileges.is_admin(privilege):
-            self.response.headers['Content-Type'] = 'application/json'
-            guestbook_name = self.request.get('guestbook_name')
+        logging.info("About to update the events cache")
+        self.response.headers['Content-Type'] = 'application/json'
+        guestbook_name = self.request.get('guestbook_name')
+        guestbook_name = "default_guestbook" if guestbook_name is None or len(guestbook_name) == 0 else guestbook_name
 
-            MemCacheHandler.update_events_cache(guestbook_name)
-            self.response.out.write('Event cache updated')
-        else:
-            return_login_screen(self)
+        MemCacheHandler.update_events_cache(guestbook_name)
+        self.response.out.write('Event cache updated')
 
 
 class Api(webapp2.RequestHandler):
@@ -68,6 +66,7 @@ class Api(webapp2.RequestHandler):
         if Privileges.can_read(privilege):
             self.response.headers['Content-Type'] = 'application/json'
             guestbook_name = self.request.get('guestbook_name')
+            guestbook_name = "default_guestbook" if guestbook_name is None or len(guestbook_name) == 0 else guestbook_name
 
             greetings = MemCacheHandler.get_all_events(guestbook_name)
             self.response.out.write(json.dumps(greetings))
@@ -140,6 +139,8 @@ class Guestbook(webapp2.RequestHandler):
         privilege = user.get_user_privileges()
         if Privileges.can_write(privilege):
             guestbook_name = self.request.get('guestbook_name')
+            guestbook_name = "default_guestbook" if guestbook_name is None or len(guestbook_name) == 0 else guestbook_name
+            
             greeting = dao.create_greeting(guestbook_name)
             greeting.author = user.get_nickname()
             greeting.content = self.request.get('content')

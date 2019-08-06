@@ -111,7 +111,7 @@ function getAndDisplayUnits(firstInit) {
       storeLastHereDateToLocalStorage(latestEventDT);
     }
   }
-  xhttp.open("GET", "/v1/api", true);
+  xhttp.open("GET", "/v1/api?guestbook_name=default_guestbook", true);
   xhttp.send();
 }
 

@@ -58,10 +58,6 @@ class MemCacheHandler():
             offset = ((count - 1) * elms_in_page) + count_in_last_page if count > 0 else count_in_last_page
             limit = elms_in_page - count_in_last_page if count_in_last_page != elms_in_page else elms_in_page
 
-            print count_in_last_page
-            print offset
-            print limit
-
             greetings = dao.get_events_from_datastore(guestbook_name, offset, limit)
 
             if greetings is not None and len(greetings) > 0:
@@ -101,7 +97,7 @@ class MemCacheHandler():
         cached_thumbnail = cls.get(cls.__thumbnail_cache_name(img_id))
         cached_photo = cls.get(cls.__photo_cache_name(img_id))
         if cached_thumbnail is None or cached_photo is None:
-            greeting_key = ndb.Key(urlsafe=img_id)
+            greeting_key = dao.get_key_for_img_id(img_id)
             greeting = greeting_key.get()
             if greeting.photo:
                 # Only add new values for images to memcache

@@ -20,5 +20,9 @@ handlers:
 - url: /fonts
   static_dir: fonts
 
+- url: /v1/cache/update
+  script: main.app
+  login: admin
+
 - url: .*
   script: main.app

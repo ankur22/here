@@ -24,3 +24,6 @@ def get_events_from_datastore(guestbook_name, offset, limit):
         ancestor=guestbook_key(guestbook_name)) \
         .order(-Greeting.date) \
         .fetch(offset=offset, limit=limit)
+
+def get_key_for_img_id(img_id):
+    return ndb.Key(urlsafe=img_id)
