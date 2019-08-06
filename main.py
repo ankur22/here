@@ -123,6 +123,24 @@ class Api(webapp2.RequestHandler):
 
         return pages
 
+    def __convert_to_response_ready_obj(self, greeting):
+        return {
+            "author": greeting.author if greeting.author else "NA",
+            "photo": "/img?type=full&img_id=" + greeting.key.urlsafe(),
+            "thumbnail": "/img?type=thumbnail&img_id=" + greeting.key.urlsafe(),
+            "notes": cgi.escape(greeting.content),
+            "lat": greeting.photo_latitude,
+            "long": greeting.photo_longitude,
+            "photoDT": greeting.photo_datetime,
+            "eventDT": str(greeting.date)
+        }
+
+    def __get_from_datastore(self, guestbook_name, offset, limit):
+        return Greeting.query(
+            ancestor=guestbook_key(guestbook_name)) \
+            .order(-Greeting.date) \
+            .fetch(offset=offset, limit=limit)
+
     def __get_all(self, guestbook_name):
         pages = self.__get_from_cache()
         count = len(pages)
@@ -134,33 +152,23 @@ class Api(webapp2.RequestHandler):
             offset = ((count - 1) * elms_in_page) + count_in_last_page if count > 0 else count_in_last_page
             limit = elms_in_page - count_in_last_page if count_in_last_page != elms_in_page else elms_in_page
 
-            greetings = Greeting.query(
-                ancestor=guestbook_key(guestbook_name)) \
-                .order(-Greeting.date) \
-                .fetch(offset=offset, limit=limit)
+            greetings = self.__get_from_datastore(guestbook_name, offset, limit)
 
             if greetings is not None and len(greetings) > 0:
                 data = []
                 for greeting in greetings:
-                    obj = {
-                        "author": greeting.author if greeting.author else "NA",
-                        "photo": "/img?type=full&img_id=" + greeting.key.urlsafe(),
-                        "thumbnail": "/img?type=thumbnail&img_id=" + greeting.key.urlsafe(),
-                        "notes": cgi.escape(greeting.content),
-                        "lat": greeting.photo_latitude,
-                        "long": greeting.photo_longitude,
-                        "photoDT": greeting.photo_datetime,
-                        "eventDT": str(greeting.date)
-                    }
+                    obj = self.__convert_to_response_ready_obj(greeting)
                     data.append(obj)
 
+                    # Only add new values for images to memcache
                     memcache.add(thumbnail_cache_name(greeting.key.urlsafe()), greeting.thumbnail)
                     memcache.add(photo_cache_name(greeting.key.urlsafe()), greeting.photo)
 
+                # Update existing memcache value
                 if len(pages) > 0 and len(pages[count - 1]["data"]) < elms_in_page:
                     pages[count - 1]["data"].extend(data)
                     memcache.replace(pages[count - 1]["page_name"], pages[count - 1])
-                else:
+                else: # Add new memcache value
                     page = {
                         "page_name": "page{}".format(count),
                         "next_page_name": "page{}".format(count + 1),
@@ -228,6 +236,7 @@ class Image(webapp2.RequestHandler):
             greeting_key = ndb.Key(urlsafe=img_id)
             greeting = greeting_key.get()
             if greeting.photo:
+                # Only add new values for images to memcache
                 memcache.add(thumbnail_cache_name(img_id), greeting.thumbnail)
                 memcache.add(photo_cache_name(img_id), greeting.photo)
                 return [greeting.thumbnail, greeting.photo]
