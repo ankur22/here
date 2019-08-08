@@ -3,9 +3,12 @@ import cgi
 from google.appengine.api import memcache
 
 import dao
+import logging
 
 
 class MemCacheHandler():
+
+    ELMS_IN_PAGE = 200
 
     @classmethod
     def __thumbnail_cache_name(cls, img_id):
@@ -47,16 +50,22 @@ class MemCacheHandler():
         }
 
     @classmethod
+    def __get_limits(pages, page_count):
+        count_in_last_page = len(pages[page_count - 1]["data"]) if page_count > 0 else 0
+        offset = ((page_count - 1) * ELMS_IN_PAGE) + count_in_last_page if page_count > 0 else count_in_last_page
+        limit = ELMS_IN_PAGE - count_in_last_page if count_in_last_page != ELMS_IN_PAGE else ELMS_IN_PAGE
+        total_elms = count_in_last_page + offset
+        return [offset, limit, total_elms]
+
+    @classmethod
     def update_events_cache(cls, guestbook_name):
         pages = cls.__get_from_cache(guestbook_name)
-        count = len(pages)
-        elms_in_page = 200
+        page_count = len(pages)
         greetings = ["na"]
+        total_elms = 0
 
         while greetings is not None and len(greetings) > 0:
-            count_in_last_page = len(pages[count - 1]["data"]) if count > 0 else 0
-            offset = ((count - 1) * elms_in_page) + count_in_last_page if count > 0 else count_in_last_page
-            limit = elms_in_page - count_in_last_page if count_in_last_page != elms_in_page else elms_in_page
+            [offset, limit, total_elms] = cls.__get_limits(pages, page_count)
 
             greetings = dao.get_events_from_datastore(guestbook_name, offset, limit)
 
@@ -71,22 +80,33 @@ class MemCacheHandler():
                     cls.add(cls.__photo_cache_name(greeting.key.urlsafe()), greeting.photo)
 
                 # Update existing memcache value
-                if len(pages) > 0 and len(pages[count - 1]["data"]) < elms_in_page:
-                    pages[count - 1]["data"].extend(data)
-                    memcache.replace(pages[count - 1]["page_name"], pages[count - 1])
+                if len(pages) > 0 and len(pages[page_count - 1]["data"]) < ELMS_IN_PAGE:
+                    pages[page_count - 1]["data"].extend(data)
+                    memcache.replace(pages[page_count - 1]["page_name"], pages[page_count - 1])
                 else: # Add new memcache value
                     page = {
-                        "page_name": cls.__get_page_name(guestbook_name, count),
-                        "next_page_name": cls.__get_page_name(guestbook_name, count + 1),
+                        "page_name": cls.__get_page_name(guestbook_name, page_count),
+                        "next_page_name": cls.__get_page_name(guestbook_name, page_count + 1),
                         "data": data
                     }
-                    count = count + 1
+                    page_count = page_count + 1
                     pages.append(page)
                     cls.add(page["page_name"], page)
+
+        memcache.replace("total_elms", total_elms)
+        return pages
 
     @classmethod
     def get_all_events(cls, guestbook_name):
         pages = cls.__get_from_cache(guestbook_name)
+
+        [offset, limit, total_elms] = cls.__get_limits(pages, page_count)
+        total_elms_frm_cache = memcache.get("total_elms")
+
+        if total_elms_frm_cache is null or total_elms != total_elms_frm_cache:
+            logging.warn("Cache out of sync {} != {} forcing cache update", total_elms_frm_cache, total_elms)
+            pages = cls.update_events_cache(guestbook_name)
+
         rtn_val = []
         for page in pages:
             rtn_val.extend(page["data"])

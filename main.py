@@ -140,7 +140,7 @@ class Guestbook(webapp2.RequestHandler):
         if Privileges.can_write(privilege):
             guestbook_name = self.request.get('guestbook_name')
             guestbook_name = "default_guestbook" if guestbook_name is None or len(guestbook_name) == 0 else guestbook_name
-            
+
             greeting = dao.create_greeting(guestbook_name)
             greeting.author = user.get_nickname()
             greeting.content = self.request.get('content')
